@@ -2,6 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { loadConfig } from './config';
 import { detectLabels, detectAreaLabels, needsInfo, generateNeedsInfoComment } from './triage';
+import { ensureLabelsExist, migrateOldLabels } from './labels';
 
 async function run(): Promise<void> {
   try {
@@ -37,9 +38,23 @@ async function run(): Promise<void> {
       ? context.payload.issue!.labels || []
       : context.payload.pull_request!.labels || [];
 
-    const existingLabelNames = existingLabels.map((label: any) =>
+    let existingLabelNames = existingLabels.map((label: any) =>
       typeof label === 'string' ? label : label.name
     );
+
+    // Migrate old labels to new format (backward compatibility)
+    const migratedLabels = await migrateOldLabels(
+      octokit,
+      context.repo.owner,
+      context.repo.repo,
+      issueNumber,
+      existingLabelNames
+    );
+    
+    // Update existing label names after migration
+    existingLabelNames = existingLabelNames
+      .filter((name: string) => !migratedLabels.some(migrated => migrated !== name))
+      .concat(migratedLabels);
 
     // Detect labels based on content
     const contentLabels = detectLabels(title, body, config);
@@ -69,8 +84,15 @@ async function run(): Promise<void> {
       }
     }
 
-    // Add all detected labels
+    // Ensure all labels exist before adding them
     if (labelsToAdd.length > 0) {
+      await ensureLabelsExist(
+        octokit,
+        context.repo.owner,
+        context.repo.repo,
+        labelsToAdd
+      );
+      
       try {
         await octokit.rest.issues.addLabels({
           owner: context.repo.owner,
@@ -90,6 +112,14 @@ async function run(): Promise<void> {
       const hasNeedsInfoLabel = existingLabelNames.includes(needsInfoLabel);
 
       if (needsInfo(title, body)) {
+        // Ensure needs-info label exists
+        await ensureLabelsExist(
+          octokit,
+          context.repo.owner,
+          context.repo.repo,
+          [needsInfoLabel]
+        );
+        
         // Add needs-info label if not present
         if (!hasNeedsInfoLabel) {
           try {
@@ -105,7 +135,7 @@ async function run(): Promise<void> {
           }
         }
 
-        // Check if we already posted a comment (idempotency check)
+        // Check if we already posted a comment (idempotency check using branding)
         const { data: comments } = await octokit.rest.issues.listComments({
           owner: context.repo.owner,
           repo: context.repo.repo,
@@ -115,7 +145,7 @@ async function run(): Promise<void> {
         const botComment = comments.find(
           comment =>
             comment.user?.type === 'Bot' &&
-            comment.body?.includes('Missing Information')
+            comment.body?.includes('Auto-triaged by IssueSheriff 🤠')
         );
 
         if (!botComment) {

@@ -47,7 +47,7 @@ const DEFAULT_CONFIG = {
         bug: 'bug',
         feature: 'feature',
         docs: 'docs',
-        priority: 'priority:high',
+        priority: 'priority: high',
         needsInfo: 'needs-info',
     },
     paths: {
@@ -56,9 +56,9 @@ const DEFAULT_CONFIG = {
         infra: ['infra'],
     },
     areaLabels: {
-        backend: 'area:backend',
-        frontend: 'area:frontend',
-        infra: 'area:infra',
+        backend: 'area: backend',
+        frontend: 'area: frontend',
+        infra: 'area: infra',
     },
 };
 function loadConfig(repoPath = '.') {

@@ -28,7 +28,7 @@ labels:
   bug: bug
   feature: feature
   docs: docs
-  priority: priority:high
+  priority: priority: high
   needsInfo: needs-info
 
 # File path patterns to detect area labels
@@ -50,7 +50,7 @@ paths:
 
 # Area labels to apply based on file paths
 areaLabels:
-  backend: area:backend
-  frontend: area:frontend
-  infra: area:infra
+  backend: area: backend
+  frontend: area: frontend
+  infra: area: infra
 

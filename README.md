@@ -5,10 +5,12 @@ A GitHub Action that automatically triages Issues and Pull Requests with intelli
 ## Features
 
 - 🏷️ **Automatic Labeling**: Detects keywords in titles and bodies to apply appropriate labels
+- 🎨 **Auto-Create Labels**: Automatically creates labels if they don't exist in your repository
 - 📁 **Area Detection**: Identifies code areas (backend/frontend/infra) based on changed files in PRs
 - 📋 **Missing Info Detection**: Flags issues missing key information and posts helpful comments
 - ⚙️ **Configurable**: Customize keywords, labels, and path rules via `.issuesheriff.yml`
 - 🔄 **Idempotent**: Safe to run multiple times without duplicating labels or comments
+- 🔙 **Backward Compatible**: Automatically migrates old label formats to new normalized ones
 
 ## Triggers
 
@@ -22,16 +24,18 @@ The action runs on:
 
 ### Content-Based Labels
 
-- **Bug**: Detects keywords like "bug", "error", "crash", "exception"
-- **Feature**: Detects keywords like "feature", "enhancement", "request"
-- **Docs**: Detects keywords like "docs", "readme", "documentation"
-- **Priority**: Detects keywords like "urgent", "priority" → applies `priority:high`
+- **bug**: Detects keywords like "bug", "error", "crash", "exception"
+- **feature**: Detects keywords like "feature", "enhancement", "request"
+- **docs**: Detects keywords like "docs", "readme", "documentation"
+- **priority: high**: Detects keywords like "urgent", "priority"
 
 ### Area Labels (PRs only)
 
-- **area:backend**: Applied when PR changes files under `/backend`
-- **area:frontend**: Applied when PR changes files under `/frontend`
-- **area:infra**: Applied when PR changes files under `/infra`
+- **area: backend**: Applied when PR changes files under `/backend`
+- **area: frontend**: Applied when PR changes files under `/frontend`
+- **area: infra**: Applied when PR changes files under `/infra`
+
+> **Note**: All labels are automatically created if they don't exist in your repository. The action uses normalized label names with proper spacing (e.g., `priority: high` instead of `priority:high`).
 
 ### Missing Info Detection
 
@@ -67,7 +71,7 @@ labels:
   bug: bug
   feature: feature
   docs: docs
-  priority: priority:high
+  priority: priority: high
   needsInfo: needs-info
 
 paths:
@@ -82,9 +86,9 @@ paths:
     - .github/
 
 areaLabels:
-  backend: area:backend
-  frontend: area:frontend
-  infra: area:infra
+  backend: area: backend
+  frontend: area: frontend
+  infra: area: infra
 ```
 
 See `.issuesheriff.yml.example` for a complete example.
@@ -233,7 +237,7 @@ Create test event files in `.github/workflows/`:
    - "Feature request: Add dark mode" → should get `feature` label
    - "Documentation update" → should get `docs` label
 
-3. **Create a test PR** that changes files in `/backend` → should get `area:backend` label
+3. **Create a test PR** that changes files in `/backend` → should get `area: backend` label
 
 4. **Check the Actions tab** to see the workflow run and logs
 
@@ -250,6 +254,7 @@ IssueSheriff/
 │   ├── index.ts                  # Main entry point
 │   ├── config.ts                 # Configuration loader
 │   ├── triage.ts                 # Triage logic
+│   ├── labels.ts                 # Label management and creation
 │   └── types.ts                  # TypeScript types
 ├── dist/                          # Built JavaScript (committed)
 ├── action.yml                     # Action metadata
@@ -280,9 +285,32 @@ IssueSheriff/
 ## Permissions
 
 The action requires the following permissions:
-- `issues: write` - To add labels and comments
-- `pull-requests: write` - To add labels
+- `issues: write` - To add labels, create labels, and post comments
+- `pull-requests: write` - To add labels and create labels
 - `contents: read` - To read repository files
+
+## Label Auto-Creation
+
+IssueSheriff automatically creates labels if they don't exist in your repository. The following labels are created with appropriate colors and descriptions:
+
+- `bug` (red) - Something isn't working
+- `feature` (green) - New feature or request
+- `docs` (blue) - Documentation improvements
+- `needs-info` (yellow) - Missing information needed to proceed
+- `priority: high` (dark red) - High priority issue or PR
+- `area: backend` (blue) - Changes to backend code
+- `area: frontend` (green) - Changes to frontend code
+- `area: infra` (purple) - Changes to infrastructure
+
+## Backward Compatibility
+
+The action automatically migrates old label formats to the new normalized format:
+- `priority:high` → `priority: high`
+- `area:backend` → `area: backend`
+- `area:frontend` → `area: frontend`
+- `area:infra` → `area: infra`
+
+When an issue or PR with old labels is processed, the action removes the old label and adds the new one.
 
 ## License
 

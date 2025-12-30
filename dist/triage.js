@@ -91,6 +91,8 @@ It looks like this issue might be missing some key information that would help u
 - [ ] **Expected behavior** - What should happen?
 - [ ] **Actual behavior** - What actually happens?
 
-Once you've added this information, we'll be able to help you faster! 🚀`;
+Once you've added this information, we'll be able to help you faster! 🚀
+
+Auto-triaged by IssueSheriff 🤠`;
 }
 //# sourceMappingURL=triage.js.map

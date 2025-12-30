@@ -13,7 +13,7 @@ const DEFAULT_CONFIG: Config = {
     bug: 'bug',
     feature: 'feature',
     docs: 'docs',
-    priority: 'priority:high',
+    priority: 'priority: high',
     needsInfo: 'needs-info',
   },
   paths: {
@@ -22,9 +22,9 @@ const DEFAULT_CONFIG: Config = {
     infra: ['infra'],
   },
   areaLabels: {
-    backend: 'area:backend',
-    frontend: 'area:frontend',
-    infra: 'area:infra',
+    backend: 'area: backend',
+    frontend: 'area: frontend',
+    infra: 'area: infra',
   },
 };
 

@@ -29975,7 +29975,7 @@ const DEFAULT_CONFIG = {
         bug: 'bug',
         feature: 'feature',
         docs: 'docs',
-        priority: 'priority:high',
+        priority: 'priority: high',
         needsInfo: 'needs-info',
     },
     paths: {
@@ -29984,9 +29984,9 @@ const DEFAULT_CONFIG = {
         infra: ['infra'],
     },
     areaLabels: {
-        backend: 'area:backend',
-        frontend: 'area:frontend',
-        infra: 'area:infra',
+        backend: 'area: backend',
+        frontend: 'area: frontend',
+        infra: 'area: infra',
     },
 };
 function loadConfig(repoPath = '.') {
@@ -30129,6 +30129,7 @@ const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
 const config_1 = __nccwpck_require__(2973);
 const triage_1 = __nccwpck_require__(3235);
+const labels_1 = __nccwpck_require__(4584);
 async function run() {
     try {
         const token = core.getInput('github-token', { required: true });
@@ -30155,7 +30156,13 @@ async function run() {
         const existingLabels = isIssue
             ? context.payload.issue.labels || []
             : context.payload.pull_request.labels || [];
-        const existingLabelNames = existingLabels.map((label) => typeof label === 'string' ? label : label.name);
+        let existingLabelNames = existingLabels.map((label) => typeof label === 'string' ? label : label.name);
+        // Migrate old labels to new format (backward compatibility)
+        const migratedLabels = await (0, labels_1.migrateOldLabels)(octokit, context.repo.owner, context.repo.repo, issueNumber, existingLabelNames);
+        // Update existing label names after migration
+        existingLabelNames = existingLabelNames
+            .filter((name) => !migratedLabels.some(migrated => migrated !== name))
+            .concat(migratedLabels);
         // Detect labels based on content
         const contentLabels = (0, triage_1.detectLabels)(title, body, config);
         const labelsToAdd = contentLabels.filter(label => !existingLabelNames.includes(label));
@@ -30177,8 +30184,9 @@ async function run() {
                 core.warning(`Failed to fetch PR files: ${error}`);
             }
         }
-        // Add all detected labels
+        // Ensure all labels exist before adding them
         if (labelsToAdd.length > 0) {
+            await (0, labels_1.ensureLabelsExist)(octokit, context.repo.owner, context.repo.repo, labelsToAdd);
             try {
                 await octokit.rest.issues.addLabels({
                     owner: context.repo.owner,
@@ -30197,6 +30205,8 @@ async function run() {
             const needsInfoLabel = config.labels.needsInfo;
             const hasNeedsInfoLabel = existingLabelNames.includes(needsInfoLabel);
             if ((0, triage_1.needsInfo)(title, body)) {
+                // Ensure needs-info label exists
+                await (0, labels_1.ensureLabelsExist)(octokit, context.repo.owner, context.repo.repo, [needsInfoLabel]);
                 // Add needs-info label if not present
                 if (!hasNeedsInfoLabel) {
                     try {
@@ -30212,14 +30222,14 @@ async function run() {
                         core.error(`Failed to add needs-info label: ${error}`);
                     }
                 }
-                // Check if we already posted a comment (idempotency check)
+                // Check if we already posted a comment (idempotency check using branding)
                 const { data: comments } = await octokit.rest.issues.listComments({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: issueNumber,
                 });
                 const botComment = comments.find(comment => comment.user?.type === 'Bot' &&
-                    comment.body?.includes('Missing Information'));
+                    comment.body?.includes('Auto-triaged by IssueSheriff 🤠'));
                 if (!botComment) {
                     try {
                         await octokit.rest.issues.createComment({
@@ -30257,6 +30267,170 @@ async function run() {
     }
 }
 run();
+
+
+/***/ }),
+
+/***/ 4584:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ensureLabelExists = ensureLabelExists;
+exports.ensureLabelsExist = ensureLabelsExist;
+exports.getOldLabelMappings = getOldLabelMappings;
+exports.migrateOldLabels = migrateOldLabels;
+const core = __importStar(__nccwpck_require__(7484));
+const LABEL_COLORS = {
+    'bug': 'd73a4a', // Red
+    'feature': '0e8a16', // Green
+    'docs': '0075ca', // Blue
+    'needs-info': 'fbca04', // Yellow
+    'priority: high': 'b60205', // Dark red
+    'area: backend': '1d76db', // Blue
+    'area: frontend': '0e8a16', // Green
+    'area: infra': '5319e7', // Purple
+};
+const LABEL_DESCRIPTIONS = {
+    'bug': 'Something isn\'t working',
+    'feature': 'New feature or request',
+    'docs': 'Documentation improvements',
+    'needs-info': 'Missing information needed to proceed',
+    'priority: high': 'High priority issue or PR',
+    'area: backend': 'Changes to backend code',
+    'area: frontend': 'Changes to frontend code',
+    'area: infra': 'Changes to infrastructure',
+};
+// Old label mappings for backward compatibility
+const OLD_LABEL_MAPPINGS = {
+    'priority:high': 'priority: high',
+    'area:backend': 'area: backend',
+    'area:frontend': 'area: frontend',
+    'area:infra': 'area: infra',
+};
+async function ensureLabelExists(octokit, owner, repo, labelName) {
+    try {
+        // Try to get the label
+        await octokit.rest.issues.getLabel({
+            owner,
+            repo,
+            name: labelName,
+        });
+        // Label exists, nothing to do
+    }
+    catch (error) {
+        // Label doesn't exist (404), create it
+        if (error.status === 404) {
+            try {
+                const color = LABEL_COLORS[labelName] || 'ededed';
+                const description = LABEL_DESCRIPTIONS[labelName] || '';
+                await octokit.rest.issues.createLabel({
+                    owner,
+                    repo,
+                    name: labelName,
+                    color: color.replace('#', ''),
+                    description: description,
+                });
+                core.info(`Created label: ${labelName}`);
+            }
+            catch (createError) {
+                core.warning(`Failed to create label ${labelName}: ${createError}`);
+            }
+        }
+        else {
+            core.warning(`Failed to check label ${labelName}: ${error}`);
+        }
+    }
+}
+async function ensureLabelsExist(octokit, owner, repo, labelNames) {
+    // Remove duplicates
+    const uniqueLabels = [...new Set(labelNames)];
+    // Ensure all labels exist
+    await Promise.all(uniqueLabels.map(label => ensureLabelExists(octokit, owner, repo, label)));
+}
+function getOldLabelMappings() {
+    return OLD_LABEL_MAPPINGS;
+}
+async function migrateOldLabels(octokit, owner, repo, issueNumber, existingLabelNames) {
+    const labelsToRemove = [];
+    const labelsToAdd = [];
+    for (const oldLabel of existingLabelNames) {
+        if (OLD_LABEL_MAPPINGS[oldLabel]) {
+            const newLabel = OLD_LABEL_MAPPINGS[oldLabel];
+            // Only migrate if new label is not already present
+            if (!existingLabelNames.includes(newLabel)) {
+                labelsToRemove.push(oldLabel);
+                labelsToAdd.push(newLabel);
+            }
+        }
+    }
+    // Remove old labels
+    for (const oldLabel of labelsToRemove) {
+        try {
+            await octokit.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                name: oldLabel,
+            });
+            core.info(`Removed old label: ${oldLabel}`);
+        }
+        catch (error) {
+            core.warning(`Failed to remove old label ${oldLabel}: ${error}`);
+        }
+    }
+    // Add new labels (after ensuring they exist)
+    if (labelsToAdd.length > 0) {
+        await ensureLabelsExist(octokit, owner, repo, labelsToAdd);
+        try {
+            await octokit.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                labels: labelsToAdd,
+            });
+            core.info(`Migrated labels: ${labelsToRemove.join(', ')} → ${labelsToAdd.join(', ')}`);
+        }
+        catch (error) {
+            core.error(`Failed to add migrated labels: ${error}`);
+        }
+    }
+    return labelsToAdd;
+}
 
 
 /***/ }),
@@ -30358,7 +30532,9 @@ It looks like this issue might be missing some key information that would help u
 - [ ] **Expected behavior** - What should happen?
 - [ ] **Actual behavior** - What actually happens?
 
-Once you've added this information, we'll be able to help you faster! 🚀`;
+Once you've added this information, we'll be able to help you faster! 🚀
+
+Auto-triaged by IssueSheriff 🤠`;
 }
 
 
