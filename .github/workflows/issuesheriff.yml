@@ -1,0 +1,24 @@
+name: IssueSheriff
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run IssueSheriff
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+

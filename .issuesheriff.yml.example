@@ -1,0 +1,56 @@
+# IssueSheriff Configuration
+# Copy this file to .issuesheriff.yml in your repository root to customize
+
+# Keywords to detect for each label type
+keywords:
+  bug:
+    - bug
+    - error
+    - crash
+    - exception
+    - broken
+  feature:
+    - feature
+    - enhancement
+    - request
+    - improvement
+  docs:
+    - docs
+    - readme
+    - documentation
+  priority:
+    - urgent
+    - priority
+    - critical
+
+# Labels to apply (override default labels)
+labels:
+  bug: bug
+  feature: feature
+  docs: docs
+  priority: priority:high
+  needsInfo: needs-info
+
+# File path patterns to detect area labels
+paths:
+  backend:
+    - backend/
+    - server/
+    - api/
+  frontend:
+    - frontend/
+    - client/
+    - web/
+  infra:
+    - infra/
+    - infrastructure/
+    - .github/
+    - docker/
+    - k8s/
+
+# Area labels to apply based on file paths
+areaLabels:
+  backend: area:backend
+  frontend: area:frontend
+  infra: area:infra
+

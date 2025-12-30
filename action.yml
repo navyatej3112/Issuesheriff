@@ -1,0 +1,17 @@
+name: 'IssueSheriff'
+description: 'Auto-triage GitHub Issues and Pull Requests with intelligent labeling'
+author: 'IssueSheriff'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
